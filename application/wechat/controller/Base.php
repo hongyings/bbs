@@ -8,16 +8,42 @@
 
 namespace app\wechat\controller;
 use think\Controller;
-use think\Request;
+use EasyWeChat\Factory;
 use Monolog\Logger;
 use Monolog\Handler\StreamHandler;
+use think\Request;
 class Base extends Controller
 {
+    const APPID='wx3fb38d0d15ae7820';
     public function __construct(Request $request = null)
     {
         parent::__construct($request);
+       
     }
     
+    
+    /**
+     * 获取access_token
+     * @return mixed
+     * @throws \EasyWeChat\Kernel\Exceptions\HttpException
+     * @throws \EasyWeChat\Kernel\Exceptions\InvalidArgumentException
+     * @throws \EasyWeChat\Kernel\Exceptions\InvalidConfigException
+     * @throws \EasyWeChat\Kernel\Exceptions\RuntimeException
+     * @throws \Psr\SimpleCache\InvalidArgumentException
+     */
+    public function token()
+    {
+        $param = $this->request->param('appid');
+        if(empty($param)){
+            exit(self::_robot(rand(0,999)));
+        }
+        $app = Factory::officialAccount(cache($param));
+        // 获取 access token 实例
+        $accessToken = $app->access_token;
+        $token = $accessToken->getToken(); // token 数组  token['access_token'] 字符串
+        
+        return $token['access_token'];
+    }
     
     //机器人消息
     public static function _robot($keyword)
@@ -125,6 +151,25 @@ class Base extends Controller
         $result = curl_exec($ch);
         curl_close($ch);
         return $result;
+    }
+    
+   
+    /**
+     * 青云客智能聊天机器人API
+     *
+     * @param string $keyword
+     * @return string
+     */
+    public static function _robot2($keyword='')
+    {
+        $msg  ='';
+        $url = "http://api.qingyunke.com/api.php?key=free&appid=0&msg=".$keyword;
+        $res = curl(urlencode($url));
+        if($res){
+            $msg = json_decode($res,true)['content'];
+        }
+        $msg=str_replace("{br}","\n",$msg);
+        return $msg;
     }
     
 }
