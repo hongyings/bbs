@@ -85,7 +85,7 @@ $options = [
 
 ##### 三、暂时不支持数据库操作，后面升级会用到
 
-​    ![测试号](C:\Users\17610\Desktop\微信图片_20190822141808.png)
+测试号：https://pan.baidu.com/s/1lfITufx2aKb6i9JveztUmA
 
 ##### 如果有更好建议请发送邮件到email:17610826019@126.com
 
