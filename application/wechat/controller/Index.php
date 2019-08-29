@@ -22,6 +22,7 @@ use think\Request;
 class Index extends Base
 {
     const APPID='wx3fb38d0d15ae7820';
+    static $app;
     public function __construct(Request $request = null)
     {
         parent::__construct($request);
@@ -29,8 +30,8 @@ class Index extends Base
     
     /**
      * 消息主入口 ()
-     *
-     * 多公众号可以用appid作为参数 ，匹配数据库中的公号配置
+     * 域名/wechat/Index/service/wx3fb38d0d15ae7820 服务器配置
+     * 多公众号可以用appid作为参数 ，匹配数据库中的公号配置已达到同时支持多公众号应用的目的
      *
      * @throws \EasyWeChat\Kernel\Exceptions\BadRequestException
      * @throws \EasyWeChat\Kernel\Exceptions\InvalidArgumentException
@@ -58,8 +59,8 @@ class Index extends Base
                 // ...
             ]
         ];
-        $appId = $app['appid'];
-        $openId = $app['openid'];
+        $appId = trim($app['appid']);
+        $openId = trim($app['openid']);
         $option = isset($options[$appId])?$options[$appId]:null;
         
         if(empty($option)){
@@ -68,9 +69,8 @@ class Index extends Base
         
         //使用cache缓存
         if(cache($appId)){
-            cache($appId,$option);
-        }
-        else{
+            $option =  cache($appId);
+        } else {
             cache($appId,$option);
         }
         
@@ -83,15 +83,15 @@ class Index extends Base
      *
      * @param $appId
      * @param $openid
-     * @param $options
+     * @param $option
      * @throws \EasyWeChat\Kernel\Exceptions\BadRequestException
      * @throws \EasyWeChat\Kernel\Exceptions\InvalidArgumentException
      * @throws \EasyWeChat\Kernel\Exceptions\InvalidConfigException
      * @throws \ReflectionException
      */
-    private function shuntMsg($appId,$openid,$options)
+    private function shuntMsg($appId,$openid,$option)
     {
-        $app = Factory::officialAccount($options);
+        $app = Factory::officialAccount($option);
         
         // 获取 access token 实例
         $server = $app->server;
@@ -100,10 +100,11 @@ class Index extends Base
         $server->push(function($message) use ($user) {
             $openid = $message['FromUserName'];
             $user = $user->get($openid);   //用户信息 array
-
+            
+            //接受消息类型
             switch ($message['MsgType']) {
                 case 'event':
-                    $msg = self::_event($openid,$user);
+                    $msg = self::_event($openid,$message['Event'],$message['EventKey']);
                     break;
                 case 'text':
                     $keyword=trim($message['Content']);
@@ -118,13 +119,14 @@ class Index extends Base
                     $msg = self::_voice($openid,$mediaId);
                     break;
                 case 'video':
+                case 'shortvideo':
                     $mediaId=trim($message['MediaId']);
                     $msg = self::_video($openid,$mediaId,'');
                     break;
-                case 'location'://微信目前不支持回复坐标消息
+                case 'location':
                     $msg = self::_location($openid);
                     break;
-                case 'link'://微信目前不支持回复链接消息
+                case 'link':
                     $msg = self::_link($openid);
                     break;
                 case 'file':
@@ -142,12 +144,24 @@ class Index extends Base
        
         //发送回复
         $server->serve()->send();
-        
     }
     
-    
     //事件消息
-    public static function _event($openid,$keyword=''){}
+    public static function _event($openid,$event,$eventKey)
+    {
+        switch ($event){
+            case 'subscribe'://用户未关注时，进行关注后的事件推送
+                break;
+            case 'SCAN':// 扫码
+                break;
+            case 'LOCATION':// 上报地理位置
+                break;
+            case 'CLICK':// 点击菜单拉取消息时的事件推送
+                break;
+            case 'VIEW':// 点击菜单跳转链接时的事件推送
+                break;
+        }
+    }
     //文字消息
     public static function _text($openid,$keyword='')
     {
@@ -267,7 +281,11 @@ class Index extends Base
         
     }
     
-    
+    //回复消息分流
+   private function shuntResponseMsg()
+   {
+   
+   }
    
     /**
      * 验证appId
@@ -275,14 +293,18 @@ class Index extends Base
      */
     private static function  checkAppId()
     {
-        $query = urldecode($_SERVER['QUERY_STRING']);
-        $pos = strrpos($query,"/");
-        $params = explode('&',substr($query,$pos+1 , mb_strlen($query)));
-        
+        $query = ($_SERVER['REQUEST_URI']);
+        $start = strrpos($query,"/");
+        $params = explode('?',substr($query,$start+1 , mb_strlen($query)));
+       
+        //查询出appid数组，替换
         if(in_array($params[0],[self::APPID])){
+            $openid='';
+            parse_str($params[1]);
+            
             return [
                 'appid'=>$params[0],
-                'openid'=>explode('=',$params[4])[1],
+                'openid'=>$openid,
             ] ;
         }
     }

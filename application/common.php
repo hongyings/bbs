@@ -59,13 +59,14 @@ function Logs($msg, $key='',$minDir='')
 {
     if(!empty($minDir) && is_string($minDir)){
         $dir=LOG_PATH.trim($minDir,'/').'/';
+    }else{
+        $dir=LOG_PATH;
     }
     
     if(!file_exists($dir)){
         mkdir(iconv("UTF-8", "utf-8", $dir), 0777, true);
     }
-    
-    $record = date('Y-m-d H:i:s') . " ===>>> " . ' ' . $key. " :" ;
+    $record = date('Y-m-d H:i:s') . ' ===>>> ' .(empty($key)?'>':$key). ':' ;
     if(is_array($msg)){
         foreach ($msg as $k => $item){
             $record.=$k.' '.$item."\n";
@@ -74,16 +75,15 @@ function Logs($msg, $key='',$minDir='')
         $record.=$msg;
     }
    
-    $path =$dir .date('Y-m');
+    $path =$dir .date('Ym');
     //设置路径目录信息
-    $filePath = $path . '/' . date('Y.m.d') . '_log.txt';
+    $filePath = $path . '/' . date('Y.m.d') . '.log';
     //目录不存在就创建
     if (!file_exists($path)) {
         //iconv防止中文名乱码
         mkdir(iconv("UTF-8", "utf-8", $path), 0777, true);
     }
     if(file_exists($path)){
-        //方式一
         file_put_contents($filePath,$record.PHP_EOL,FILE_APPEND);
     }
 }
