@@ -50,7 +50,7 @@
 }
 
 /**
- * 记录日志 txt 删除日志将写入计划任务中
+ * 记录日志 txt (支持两层数组)
  * @param $msg array | string 要写入的日志信息
  * @param $key string 要传入的日志类型
  * @param $minDir string 要传入的日志路径
@@ -66,13 +66,22 @@ function Logs($msg, $key='',$minDir='')
     if(!file_exists($dir)){
         mkdir(iconv("UTF-8", "utf-8", $dir), 0777, true);
     }
-    $record = date('Y-m-d H:i:s') . ' ===>>> ' .(empty($key)?'>':$key). ':' ;
+    $record = date('Y-m-d H:i:s') . ' ==>>> ' .(empty($key)?'>':$key). ':' ;
+    is_object($msg) && $msg=(array)$msg;
+    is_string($msg) && $msg=(array)$msg;
+    
     if(is_array($msg)){
         foreach ($msg as $k => $item){
-            $record.=$k.' '.$item."\n";
+            if(is_array($item)){
+                foreach ($item as $i => $val){
+                    $record.= $k.' => '.$i.' => '.$val."\n";
+                }
+            }else{
+                $record.=$k.' => '.$item."\n";
+            }
         }
     }else{
-        $record.=$msg;
+        $record.=$msg."\n";
     }
    
     $path =$dir .date('Ym');
@@ -86,4 +95,18 @@ function Logs($msg, $key='',$minDir='')
     if(file_exists($path)){
         file_put_contents($filePath,$record.PHP_EOL,FILE_APPEND);
     }
+    
 }
+
+/**
+ * uniqid(prefix,more_entropy) prefix 参数为空，则返回 13 个字符串长,more_entropy 参数设置为true，则是 23 个字符串
+ * @param string $fix
+ * @param int $length
+ * @return string
+ */
+function uid($fix='',$length=13)
+{
+    $id = $fix.substr(md5(uniqid(mt_rand(), true)),0,$length);
+    return $id;
+}
+

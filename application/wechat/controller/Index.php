@@ -18,7 +18,7 @@ use EasyWeChat\Kernel\Messages\Article;
 use EasyWeChat\Kernel\Messages\Media;
 use EasyWeChat\Kernel\Messages\Raw;
 use think\Request;
-
+use app\wechat\model\KeyModel;
 class Index extends Base
 {
     const APPID='wx3fb38d0d15ae7820';
@@ -30,7 +30,7 @@ class Index extends Base
     
     /**
      * 消息主入口 ()
-     * 域名/wechat/Index/service/wx3fb38d0d15ae7820 服务器配置
+     * 域名/wechat/Index/service/wx3fb38d0d15ae7820 服务器配置(带上appid)
      * 多公众号可以用appid作为参数 ，匹配数据库中的公号配置已达到同时支持多公众号应用的目的
      *
      * @throws \EasyWeChat\Kernel\Exceptions\BadRequestException
@@ -56,7 +56,6 @@ class Index extends Base
                     'level' => 'debug',
                     'file'  => '/opt/code/wxgzh/logs/easywechat.log',
                 ],
-                // ...
             ]
         ];
         $appId = trim($app['appid']);
@@ -96,19 +95,18 @@ class Index extends Base
         // 获取 access token 实例
         $server = $app->server;
         $user = $app->user;
+//        $message = $server->getMessage();
         
-        $server->push(function($message) use ($user) {
+        $app->server->push(function ($message) use ($appId) {
             $openid = $message['FromUserName'];
-            $user = $user->get($openid);   //用户信息 array
-            
             //接受消息类型
             switch ($message['MsgType']) {
                 case 'event':
-                    $msg = self::_event($openid,$message['Event'],$message['EventKey']);
+                    $msg = self::_event($appId,$openid,$message['Event'],$message['EventKey']);
                     break;
                 case 'text':
                     $keyword=trim($message['Content']);
-                    $msg = self::_text($openid,$keyword);
+                    $msg = self::_text($appId,$openid,$keyword);
                     break;
                 case 'image':
                     $mediaId=trim($message['MediaId']);
@@ -137,20 +135,23 @@ class Index extends Base
                     $msg='success';
                     break;
             }
-            return empty($msg)?'success':$msg;
-
+            return $msg;
         });
+    
         
-       
         //发送回复
         $server->serve()->send();
+    
     }
     
     //事件消息
-    public static function _event($openid,$event,$eventKey)
+    public static function _event($appId,$openid,$event,$eventKey)
     {
+        $msg='';
+        Logs(['event'=>$event,'eventKey'=>$eventKey],'event','gzh');
         switch ($event){
             case 'subscribe'://用户未关注时，进行关注后的事件推送
+                $msg = self::_text($appId,$openid,$event);
                 break;
             case 'SCAN':// 扫码
                 break;
@@ -161,15 +162,21 @@ class Index extends Base
             case 'VIEW':// 点击菜单跳转链接时的事件推送
                 break;
         }
+        return $msg;
     }
     //文字消息
-    public static function _text($openid,$keyword='')
+    public static function _text($appId,$openid,$keyword='')
     {
         //查询数据库
-        if(!empty($msg)){
-            $text = new Text('您好！overtrue。');
-            $msg = $text;
-        }else {
+        $con = self::getKeysMsg($appId,$keyword);
+        $msg='';
+        if(!empty($con)){
+            foreach ($con as $item){
+                $content=json_decode(trim($item['content']),true);
+                $msg =  self::shuntResponseMsg($item['msgtype'],$content);
+            }
+        }
+        else {
             //机器人回复
             $msg = self::_robot($keyword);
         }
@@ -204,29 +211,31 @@ class Index extends Base
     
    
     
-    
     /**
-     * 发送客服消息
+     * 发送客服消息(原始客服消息)
      *
      * @param $openId
      * @param $msgType
      * @param $content
+     * @param bool $kf_type
      * @return array|\EasyWeChat\Kernel\Support\Collection|object|\Psr\Http\Message\ResponseInterface|string
      * @throws \EasyWeChat\Kernel\Exceptions\InvalidArgumentException
      * @throws \EasyWeChat\Kernel\Exceptions\RuntimeException
      */
-    public static function _kf($openId,$msgType,$content)
+    public static function _kf($openId,$msgType,$content,$kf_type=true)
     {
-        $msg=[
-           'touser' => $openId,
-           'msgtype' => $msgType,
-           
-        ];
-        $msgType == 'text' && $msg['text'] = ['content'=>$content];
-        in_array($msgType,['image','voice','video']) && $msg["$msgType"] = ['media_id'=>$content];
-
-        $message = new Raw(json_encode($msg));
-    
+        if($kf_type){
+            $msg=[
+                'touser' => $openId,
+                'msgtype' => $msgType,
+                "$msgType"=>$content
+            ];
+            $message = new Raw(json_encode($msg,JSON_UNESCAPED_UNICODE));
+            
+        }else{
+            $message = self :: shuntResponseMsg($msgType,$content);
+        }
+        
         $app = Factory::officialAccount(cache(self::APPID));
         $result = $app->customer_service->message($message)->to($openId)->send();
         return $result;
@@ -281,10 +290,56 @@ class Index extends Base
         
     }
     
-    //回复消息分流
-   private function shuntResponseMsg()
+    //回复消息分流(非原始方式)
+   private static function shuntResponseMsg($msgType,$msg)
    {
-   
+        switch ($msgType){
+            case 'text':
+                $msg = new Text($msg['content']);
+                break;
+            case 'image':
+                $msg = new Image($msg['mediaId']);
+                break;
+            case 'voice':
+                $msg = new Voice($msg['mediaId']);
+                break;
+            case 'video':
+                $msg = new Video($msg['mediaId'], [
+                    'title' => $msg['title'],
+                    'description' => $msg['description'],
+                ]);
+                break;
+            case 'news':    //单条
+                if(isset($msg['title'])){   //自定义
+                    $items = [
+                        new NewsItem([
+                            'title'       => $msg['title'],
+                            'description' => $msg['description'],
+                            'url'         => $msg['url'],  //路径
+                            'image'       => $msg['image'],//路径
+                        ]),
+                    ];
+                    $msg = new News($items);
+                }else{  //素材
+                    $msg = new Media($msg['mediaId'], 'mpnews');
+                }
+                break;
+            case 'article': //待确认
+                $items = [
+                    'title'   => 'EasyWeChat',
+                    'author'  => 'overtrue',
+                    'content' => 'EasyWeChat 是一个开源的微信 SDK，它... ...',
+                    'thumb_media_id ' => '',
+                    'digest ' => '',
+                    'source_url ' => '',
+                    'show_cover ' => '',
+                ];
+                $msg = new Article($items);
+                break;
+            default:
+                break;
+        }
+        return $msg;
    }
    
     /**
@@ -293,7 +348,7 @@ class Index extends Base
      */
     private static function  checkAppId()
     {
-        $query = ($_SERVER['REQUEST_URI']);
+        $query = $_SERVER['REQUEST_URI'];
         $start = strrpos($query,"/");
         $params = explode('?',substr($query,$start+1 , mb_strlen($query)));
        
@@ -302,12 +357,17 @@ class Index extends Base
             $openid='';
             parse_str($params[1]);
             
-            return [
-                'appid'=>$params[0],
-                'openid'=>$openid,
-            ] ;
+            return ['appid'=>$params[0], 'openid'=>$openid] ;
         }
+        return [];
     }
     
+    
+    
+    public static function getKeysMsg($appId,$keys)
+    {
+        $res = KeyModel::getKeyMsg('msg_id,msgtype,content',['status'=>1,'keys'=>$keys,'appid'=>$appId]);
+       return $res;
+    }
     
 }
