@@ -85,9 +85,7 @@ $options = [
 
 ##### 三、暂时不支持数据库操作，后面升级会用到
 
-测试号：https://pan.baidu.com/s/1lfITufx2aKb6i9JveztUmA 
-
-![测试号二维码](https://pan.baidu.com/s/1lfITufx2aKb6i9JveztUmA)
+![测试号二维码](.github/images/erweima.png)
 
 
 ##### 如果有更好建议请发送邮件到email:17610826019@126.com
