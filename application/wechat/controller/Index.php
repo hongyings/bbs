@@ -17,8 +17,10 @@ use EasyWeChat\Kernel\Messages\NewsItem;
 use EasyWeChat\Kernel\Messages\Article;
 use EasyWeChat\Kernel\Messages\Media;
 use EasyWeChat\Kernel\Messages\Raw;
+use EasyWeChat\Kernel\Messages\Transfer;
 use think\Request;
 use app\wechat\model\KeyModel;
+use app\wechat\job\WeChatService;
 class Index extends Base
 {
     const APPID='wx3fb38d0d15ae7820';
@@ -58,9 +60,9 @@ class Index extends Base
                 ],
             ]
         ];
-        $appId = trim($app['appid']);
-        $openId = trim($app['openid']);
-        $option = isset($options[$appId])?$options[$appId]:null;
+        $appId  = isset($app['appid']) ? trim($app['appid']) : null;
+        $openId = isset($app['openid']) ? trim($app['openid']) : null;
+        $option = isset($options[$appId]) ? $options[$appId] : null;
         
         if(empty($option)){
             echo 'success';die;
@@ -94,31 +96,35 @@ class Index extends Base
         
         // 获取 access token 实例
         $server = $app->server;
-        $user = $app->user;
-//        $message = $server->getMessage();
-        
+        $user   = $app->user;
+        $message = $server->getMessage();
+        Logs(['appid'=>$appId,'openid'=>$openid,'message'=>$message],'record','gzh');
+       
         $app->server->push(function ($message) use ($appId) {
-            $openid = $message['FromUserName'];
+            $openid   =  isset($message['FromUserName']) ? trim($message['FromUserName']):null;
+            $event    =  isset($message['Event'])        ? trim($message['Event']):null;
+            $eventKey =  isset($message['EventKey'])     ? trim($message['EventKey']):null;
+            $mediaId  =  isset($message['MediaId'])      ? trim($message['MediaId']):null;
+            
             //接受消息类型
             switch ($message['MsgType']) {
                 case 'event':
-                    $msg = self::_event($appId,$openid,$message['Event'],$message['EventKey']);
+                    $msg = self::_event($appId,$openid,$event,$eventKey);
                     break;
                 case 'text':
-                    $keyword=trim($message['Content']);
-                    $msg = self::_text($appId,$openid,$keyword);
+                    $keyword  =  isset($message['Content']) ? trim($message['Content']):null;
+                    $msg = self::_response($appId,$openid,$keyword);
                     break;
                 case 'image':
-                    $mediaId=trim($message['MediaId']);
-                    $msg = self::_image($openid,$mediaId);
+                    $picUrl  =  isset($message['PicUrl']) ? trim($message['PicUrl']):null;
+                    $msg = self::_image($openid,$mediaId,$picUrl);
                     break;
                 case 'voice':
-                    $mediaId=trim($message['MediaId']);
-                    $msg = self::_voice($openid,$mediaId);
+                    $format  =  isset($message['Format']) ? trim($message['Format']):null;
+                    $msg = self::_voice($openid,$mediaId,$format);
                     break;
                 case 'video':
                 case 'shortvideo':
-                    $mediaId=trim($message['MediaId']);
                     $msg = self::_video($openid,$mediaId,'');
                     break;
                 case 'location':
@@ -135,7 +141,7 @@ class Index extends Base
                     $msg='success';
                     break;
             }
-            return $msg;
+            return empty($msg)?'success':$msg;
         });
     
         
@@ -150,22 +156,26 @@ class Index extends Base
         $msg='';
         Logs(['event'=>$event,'eventKey'=>$eventKey],'event','gzh');
         switch ($event){
-            case 'subscribe'://用户未关注时，进行关注后的事件推送
-                $msg = self::_text($appId,$openid,$event);
+            case 'subscribe'://用户未关注时，进行关注后的事件推送 $eventKey=null
+                $msg = self::_response($appId,$openid,$event);
                 break;
             case 'SCAN':// 扫码
+                $msg = self::_response($appId,$openid,$eventKey);
                 break;
             case 'LOCATION':// 上报地理位置
                 break;
             case 'CLICK':// 点击菜单拉取消息时的事件推送
+                $msg = self::_response($appId,$openid,$eventKey);
                 break;
             case 'VIEW':// 点击菜单跳转链接时的事件推送
+                $msg = self::_response($appId,$openid,$eventKey);
                 break;
         }
         return $msg;
     }
-    //文字消息
-    public static function _text($appId,$openid,$keyword='')
+    
+    //回复消息主入口
+    public static function _response($appId,$openid,$keyword='')
     {
         //查询数据库
         $con = self::getKeysMsg($appId,$keyword);
@@ -173,23 +183,22 @@ class Index extends Base
         if(!empty($con)){
             foreach ($con as $item){
                 $content=json_decode(trim($item['content']),true);
-                $msg =  self::shuntResponseMsg($item['msgtype'],$content);
+                $msg =  self::shuntResponseMsg($item['msgtype'],$content,$openid);
             }
         }
         else {
             //机器人回复
             $msg = self::_robot($keyword);
         }
-        
         return  $msg;
     }
     //图片消息
-    public static function _image($openid,$mediaId)
+    public static function _image($openid,$mediaId,$picUrl)
     {
         return  $image = new Image($mediaId);
     }
     //语音消息
-    public static function _voice($openid,$mediaId)
+    public static function _voice($openid,$mediaId,$format)
     {
         return  $voice = new Voice($mediaId);
     }
@@ -233,9 +242,8 @@ class Index extends Base
             $message = new Raw(json_encode($msg,JSON_UNESCAPED_UNICODE));
             
         }else{
-            $message = self :: shuntResponseMsg($msgType,$content);
+            $message = self :: shuntResponseMsg($msgType,$content,$openId);
         }
-        
         $app = Factory::officialAccount(cache(self::APPID));
         $result = $app->customer_service->message($message)->to($openId)->send();
         return $result;
@@ -248,30 +256,77 @@ class Index extends Base
     {
         $buttons = [
             [
-                "type" => "click",
-                "name" => "今日歌曲",
-                "key"  => "V1001_TODAY_MUSIC"
-            ],
-            [
-                "name"       => "菜单",
-                "sub_button" => [
+                "name"=> "扫码",
+                "sub_button"=>[
+                    [
+                        "type"=>"scancode_waitmsg",
+                        "name"=>"扫码带提示",
+                        "key"=> "rselfmenu_0_0",
+                        "sub_button"=>[]
+                    ],
+                    [
+                        "type"=> "scancode_push",
+                        "name"=> "扫码推事件",
+                        "key"=> "rselfmenu_0_1",
+                        "sub_button"=>[]
+                    ],
+                    [
+                        "type" => "click",
+                        "name" => "今日歌曲",
+                        "key"  => "V1001_TODAY_MUSIC"
+                    ],
                     [
                         "type" => "view",
                         "name" => "搜索",
                         "url"  => "http://www.soso.com/"
                     ],
-                    [
-                        "type" => "view",
-                        "name" => "视频",
-                        "url"  => "http://v.qq.com/"
-                    ],
-                    [
-                        "type" => "click",
-                        "name" => "赞一下我们",
-                        "key" => "V1001_GOOD"
-                    ],
                 ],
-            ],
+                [
+                    "name"=> "发图",
+                    "sub_button"=>[
+                        [
+                            "type"=> "pic_sysphoto",
+                            "name"=> "系统拍照发图",
+                            "key"=> "rselfmenu_1_0",
+                            "sub_button"=>[]
+                        ],
+                        [
+                            "type"=>"pic_photo_or_album",
+                            "name"=> "拍照或者相册发图",
+                            "key"=> "rselfmenu_1_1",
+                            "sub_button"=>[]
+                        ],
+                        [
+                            "type"=>"pic_weixin",
+                            "name"=> "微信相册发图",
+                            "key"=> "rselfmenu_1_2",
+                            "sub_button"=>[]
+                        ]
+                    ]
+                ],
+                [
+                    "name"=> "发送位置",
+                    "sub_button"=>[
+                        [
+                            "type"=> "location_select",
+                            "key"=> "rselfmenu_2_0",
+                            "sub_button"=>[]
+                        ],
+                        [
+                            "type"=>"media_id",
+                            "name"=> "图片",
+                            "media_id"=> "MEDIA_ID1",
+                            "sub_button"=>[]
+                        ],
+                        [
+                            "type"=>"view_limited",
+                            "name"=> "图文消息",
+                            "key"=> "MEDIA_ID2",
+                            "sub_button"=>[]
+                        ]
+                    ]
+                ],
+            ]
         ];
     
         $matchRule = [
@@ -284,18 +339,26 @@ class Index extends Base
             "language" => "zh_CN"
         ];
         $app = Factory::officialAccount(cache(self::APPID));
-//        $app->menu->create($buttons,$matchRule);
-        $current = $app->menu->current();
-        var_dump($current);
+        $app->menu->create($buttons,$matchRule);
+//        $current = $app->menu->current();
+//        var_dump($current);
         
+    }
+    public function scene()
+    {
+        $app = Factory::officialAccount(cache(self::APPID));
+        $result = $app->qrcode->temporary('foo', 6 * 24 * 3600);
+        var_dump($result);
     }
     
     //回复消息分流(非原始方式)
-   private static function shuntResponseMsg($msgType,$msg)
+   private static function shuntResponseMsg($msgType,$msg,$openId)
    {
         switch ($msgType){
             case 'text':
-                $msg = new Text($msg['content']);
+                if(isset($msg['content'])){
+                    $msg = new Text($msg['content']);
+                }
                 break;
             case 'image':
                 $msg = new Image($msg['mediaId']);
@@ -336,6 +399,9 @@ class Index extends Base
                 ];
                 $msg = new Article($items);
                 break;
+            case 'msgmenu':
+                self::_kf($openId,$msgType,$msg);
+                break;
             default:
                 break;
         }
@@ -351,13 +417,16 @@ class Index extends Base
         $query = $_SERVER['REQUEST_URI'];
         $start = strrpos($query,"/");
         $params = explode('?',substr($query,$start+1 , mb_strlen($query)));
-       
+        Logs($params,'params');
         //查询出appid数组，替换
         if(in_array($params[0],[self::APPID])){
             $openid='';
-            parse_str($params[1]);
-            
-            return ['appid'=>$params[0], 'openid'=>$openid] ;
+            $param=['appid'=>$params[0]];
+            if(isset($params[1])){
+                parse_str($params[1]);
+                $param['openid']=$openid;
+            }
+            return $param;
         }
         return [];
     }

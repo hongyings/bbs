@@ -88,7 +88,7 @@ $options = [
 ![测试号二维码](.github/images/erweima.png)
 
 
-##### 如果有更好建议请发送邮件到email:17610826019@126.com
+##### 如果有更好建议请发送邮件到email:api_hongying@126.com
 
 ##### License
 

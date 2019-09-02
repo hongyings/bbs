@@ -55,7 +55,7 @@
  * @param $key string 要传入的日志类型
  * @param $minDir string 要传入的日志路径
  */
-function Logs($msg, $key='',$minDir='')
+function Logs($msg, $key='',$minDir='gzh')
 {
     if(!empty($minDir) && is_string($minDir)){
         $dir=LOG_PATH.trim($minDir,'/').'/';
