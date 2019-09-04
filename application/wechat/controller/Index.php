@@ -42,8 +42,8 @@ class Index extends Base
      */
     public function service()
     {
+        //如果不是上面格式，请注释下面四行代码
        $app  = self::checkAppId();
-       
        if(empty($app)){
            echo 'success';die;
        }
@@ -99,6 +99,8 @@ class Index extends Base
         $user   = $app->user;
         $message = $server->getMessage();
         Logs(['appid'=>$appId,'openid'=>$openid,'message'=>$message],'record','gzh');
+    
+        $app->server->push(function(){return 'success';});
        
         $app->server->push(function ($message) use ($appId) {
             $openid   =  isset($message['FromUserName']) ? trim($message['FromUserName']):null;
@@ -127,10 +129,10 @@ class Index extends Base
                 case 'shortvideo':
                     $msg = self::_video($openid,$mediaId,'');
                     break;
-                case 'location':
+                case 'location':    //微信暂不支持
                     $msg = self::_location($openid);
                     break;
-                case 'link':
+                case 'link':    //微信暂不支持
                     $msg = self::_link($openid);
                     break;
                 case 'file':
@@ -410,6 +412,7 @@ class Index extends Base
    
     /**
      * 验证appId
+     * /wechat/Index/service/wx3fb38d0d15ae7820
      * @return array
      */
     private static function  checkAppId()
@@ -432,7 +435,7 @@ class Index extends Base
     }
     
     
-    
+    //获取自定义回复内容
     public static function getKeysMsg($appId,$keys)
     {
         $res = KeyModel::getKeyMsg('msg_id,msgtype,content',['status'=>1,'keys'=>$keys,'appid'=>$appId]);
