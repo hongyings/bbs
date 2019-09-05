@@ -174,64 +174,6 @@ class Message extends Base
         return $result;
     }
     
-    
-//    //回复消息分流(非原始方式)
-//    private static function shuntResponseMsg($msgType,$msg,$openId,$appId)
-//    {
-//        switch ($msgType){
-//            case 'text':
-//                if(isset($msg['content'])){
-//                    $msg = new Text($msg['content']);
-//                }
-//                break;
-//            case 'image':
-//                $msg = new Image($msg['mediaId']);
-//                break;
-//            case 'voice':
-//                $msg = new Voice($msg['mediaId']);
-//                break;
-//            case 'video':
-//                $msg = new Video($msg['mediaId'], [
-//                    'title' => $msg['title'],
-//                    'description' => $msg['description'],
-//                ]);
-//                break;
-//            case 'news':    //单条
-//                if(isset($msg['title'])){   //自定义
-//                    $items = [
-//                        new NewsItem([
-//                            'title'       => $msg['title'],
-//                            'description' => $msg['description'],
-//                            'url'         => $msg['url'],  //路径
-//                            'image'       => $msg['image'],//路径
-//                        ]),
-//                    ];
-//                    $msg = new News($items);
-//                }else{  //素材
-//                    $msg = new Media($msg['mediaId'], 'mpnews');
-//                }
-//                break;
-//            case 'article': //待确认
-//                $items = [
-//                    'title'   => 'EasyWeChat',
-//                    'author'  => 'overtrue',
-//                    'content' => 'EasyWeChat 是一个开源的微信 SDK，它... ...',
-//                    'thumb_media_id ' => '',
-//                    'digest ' => '',
-//                    'source_url ' => '',
-//                    'show_cover ' => '',
-//                ];
-//                $msg = new Article($items);
-//                break;
-//            case 'msgmenu':
-//                self::_json($appId,$openId,$msgType,$msg);
-//                break;
-//            default:
-//                break;
-//        }
-//        return $msg;
-//    }
-    
     //获取自定义回复内容
     public static function getKeysMsg($appId,$keys)
     {
