@@ -11,12 +11,7 @@ use EasyWeChat\Factory;
 use EasyWeChat\Kernel\Messages\Image;
 use EasyWeChat\Kernel\Messages\Video;
 use EasyWeChat\Kernel\Messages\Voice;
-use EasyWeChat\Kernel\Messages\News;
-use EasyWeChat\Kernel\Messages\NewsItem;
-use EasyWeChat\Kernel\Messages\Article;
-use EasyWeChat\Kernel\Messages\Media;
 use EasyWeChat\Kernel\Messages\Raw;
-use EasyWeChat\Kernel\Messages\Transfer;
 use app\wechat\model\KeyModel;
 
 class Message extends Base
