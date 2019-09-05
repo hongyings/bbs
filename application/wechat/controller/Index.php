@@ -112,7 +112,7 @@ class Index extends Base
             
             switch ($appId){
                 case 'wx3fb38d0d15ae7820':
-                    curl('https://zdata.zmedc.com/wxgzh/wechat/Message/shuntMsg',$message);
+                    curl('/wechat/Message/shuntMsg',$message);
                     break;
             }
             //缓存消息id
