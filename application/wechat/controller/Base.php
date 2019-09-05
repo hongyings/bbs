@@ -9,18 +9,16 @@
 namespace app\wechat\controller;
 use think\Controller;
 use EasyWeChat\Factory;
-use Monolog\Logger;
-use Monolog\Handler\StreamHandler;
 use think\Request;
 class Base extends Controller
 {
     const APPID='wx3fb38d0d15ae7820';
+    const RESPONSE='success';
     public function __construct(Request $request = null)
     {
         parent::__construct($request);
        
     }
-    
     
     /**
      * 获取access_token

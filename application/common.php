@@ -53,12 +53,13 @@
  * 记录日志 txt (支持两层数组)
  * @param $msg array | string 要写入的日志信息
  * @param $key string 要传入的日志类型
- * @param $minDir string 要传入的日志路径
+ * @param $lastDir string 要传入的日志路径
+ * @param $file string 要传入的日志文件名
  */
-function Logs($msg, $key='',$minDir='gzh')
+function Logs($msg, $key='',$lastDir='gzh',$file='')
 {
-    if(!empty($minDir) && is_string($minDir)){
-        $dir=LOG_PATH.trim($minDir,'/').'/';
+    if(!empty($lastDir) && is_string($lastDir)){
+        $dir=LOG_PATH.trim($lastDir,'/').'/';
     }else{
         $dir=LOG_PATH;
     }
@@ -68,7 +69,6 @@ function Logs($msg, $key='',$minDir='gzh')
     }
     $record = date('Y-m-d H:i:s') . ' ==>>> ' .(empty($key)?'>':$key). ':' ;
     is_object($msg) && $msg=(array)$msg;
-    is_string($msg) && $msg=(array)$msg;
     
     if(is_array($msg)){
         foreach ($msg as $k => $item){
@@ -86,7 +86,12 @@ function Logs($msg, $key='',$minDir='gzh')
    
     $path =$dir .date('Ym');
     //设置路径目录信息
-    $filePath = $path . '/' . date('Y.m.d') . '.log';
+    if(empty($file)){
+        $filePath = $path . '/' . date('Y.m.d') . '.log';
+    }else{
+        $filePath = $path . '/' . $file . '.log';
+    }
+    
     //目录不存在就创建
     if (!file_exists($path)) {
         //iconv防止中文名乱码
