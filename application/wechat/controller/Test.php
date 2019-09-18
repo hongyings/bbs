@@ -9,8 +9,13 @@
 namespace app\wechat\controller;
 
 use EasyWeChat\Factory;
+
 class Test extends Base
 {
+    public function version()
+    {
+        var_dump(phpinfo());
+    }
     /**
      * @throws \Exception
      */
